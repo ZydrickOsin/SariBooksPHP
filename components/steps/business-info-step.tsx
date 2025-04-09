@@ -11,9 +11,10 @@ interface StepProps {
   formData: FormData
   updateFormData: (data: FormData) => void
   errors: Record<string, string>
+  isLoading?: boolean
 }
 
-export default function BusinessInfoStep({ formData, updateFormData, errors }: StepProps) {
+export default function BusinessInfoStep({ formData, updateFormData, errors, isLoading = false }: StepProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     updateFormData({ ...formData, [name]: value })
@@ -75,13 +76,18 @@ export default function BusinessInfoStep({ formData, updateFormData, errors }: S
             placeholder="Sari-Sari Store"
             required
             className={errors.businessName ? "border-red-500" : ""}
+            disabled={isLoading}
           />
           {errors.businessName && <p className="text-red-500 text-sm">{errors.businessName}</p>}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="businessType">Business type</Label>
-          <Select value={formData.businessType} onValueChange={(value) => handleSelectChange("businessType", value)}>
+          <Select
+            value={formData.businessType}
+            onValueChange={(value) => handleSelectChange("businessType", value)}
+            disabled={isLoading}
+          >
             <SelectTrigger id="businessType" className={errors.businessType ? "border-red-500" : ""}>
               <SelectValue placeholder="Select business type" />
             </SelectTrigger>
@@ -98,7 +104,11 @@ export default function BusinessInfoStep({ formData, updateFormData, errors }: S
 
         <div className="space-y-2">
           <Label htmlFor="businessSize">Business size</Label>
-          <Select value={formData.businessSize} onValueChange={(value) => handleSelectChange("businessSize", value)}>
+          <Select
+            value={formData.businessSize}
+            onValueChange={(value) => handleSelectChange("businessSize", value)}
+            disabled={isLoading}
+          >
             <SelectTrigger id="businessSize">
               <SelectValue placeholder="Select business size" />
             </SelectTrigger>
@@ -114,7 +124,11 @@ export default function BusinessInfoStep({ formData, updateFormData, errors }: S
 
         <div className="space-y-2">
           <Label htmlFor="industry">Industry</Label>
-          <Select value={formData.industry} onValueChange={(value) => handleSelectChange("industry", value)}>
+          <Select
+            value={formData.industry}
+            onValueChange={(value) => handleSelectChange("industry", value)}
+            disabled={isLoading}
+          >
             <SelectTrigger id="industry" className={errors.industry ? "border-red-500" : ""}>
               <SelectValue placeholder="Select industry" />
             </SelectTrigger>
@@ -138,6 +152,7 @@ export default function BusinessInfoStep({ formData, updateFormData, errors }: S
             onChange={handleChange}
             placeholder="123 Rizal Street, Barangay San Antonio, Manila"
             rows={3}
+            disabled={isLoading}
           />
         </div>
       </div>

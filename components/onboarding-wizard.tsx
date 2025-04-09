@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import BusinessInfoStep from "./steps/business-info-step"
 import TaxInfoStep from "./steps/tax-info-step"
@@ -9,6 +10,7 @@ import CompletionStep from "./steps/completion-step"
 import StepIndicator from "./step-indicator"
 import StepNavigation from "./step-navigation"
 import SariBooksLogo from "./saribooks-logo"
+import { saveBusinessInfo, saveTaxInfo, savePreferences, completeOnboarding } from "@/app/actions/onboarding-actions"
 
 export type FormData = {
   // Business info
@@ -50,53 +52,172 @@ const initialFormData: FormData = {
   chartOfAccounts: "standard",
   currencyPreference: "PHP",
   digitalReceipts: true,
-  // In a real app, you would get these from the authentication context
-  firstName: "Juan",
-  lastName: "Dela Cruz",
-  email: "juan@example.com",
 }
 
 export default function OnboardingWizard() {
   const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(false)
+  const [generalError, setGeneralError] = useState("")
+  const router = useRouter()
+
+  // In a real app, you would fetch user data here
+  useEffect(() => {
+    // Simulate fetching user data
+    setFormData((prev) => ({
+      ...prev,
+      firstName: "Juan",
+      lastName: "Dela Cruz",
+      email: "juan@example.com",
+    }))
+  }, [])
 
   const steps = [
     {
       title: "Business",
-      component: <BusinessInfoStep formData={formData} updateFormData={setFormData} errors={errors} />,
-      validate: () => {
-        const newErrors: Record<string, string> = {}
+      component: (
+        <BusinessInfoStep formData={formData} updateFormData={setFormData} errors={errors} isLoading={isLoading} />
+      ),
+      validate: async () => {
+        setIsLoading(true)
+        setGeneralError("")
+        setErrors({})
 
-        if (!formData.businessName) newErrors.businessName = "Business name is required"
-        if (!formData.businessType) newErrors.businessType = "Business type is required"
-        if (!formData.industry) newErrors.industry = "Industry is required"
+        // Create FormData object for server action
+        const submitData = new FormData()
+        submitData.append("businessName", formData.businessName)
+        submitData.append("businessType", formData.businessType)
+        submitData.append("businessSize", formData.businessSize)
+        submitData.append("industry", formData.industry)
+        submitData.append("businessAddress", formData.businessAddress)
 
-        setErrors(newErrors)
-        return Object.keys(newErrors).length === 0
+        try {
+          const result = await saveBusinessInfo(submitData)
+
+          if (result) {
+            // Handle errors
+            if (result.errors) {
+              const fieldErrors: Record<string, string> = {}
+              Object.entries(result.errors).forEach(([key, messages]) => {
+                fieldErrors[key] = messages[0]
+              })
+              setErrors(fieldErrors)
+            }
+
+            if (result.message) {
+              setGeneralError(result.message)
+            }
+
+            setIsLoading(false)
+            return false
+          }
+
+          setIsLoading(false)
+          return true
+        } catch (error) {
+          setGeneralError("An unexpected error occurred. Please try again.")
+          setIsLoading(false)
+          return false
+        }
       },
     },
     {
       title: "Tax Info",
-      component: <TaxInfoStep formData={formData} updateFormData={setFormData} errors={errors} />,
-      validate: () => {
-        const newErrors: Record<string, string> = {}
+      component: <TaxInfoStep formData={formData} updateFormData={setFormData} errors={errors} isLoading={isLoading} />,
+      validate: async () => {
+        setIsLoading(true)
+        setGeneralError("")
+        setErrors({})
 
-        if (!formData.tinNumber) newErrors.tinNumber = "TIN number is required"
-        else if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(formData.tinNumber) && !/^\d{9}$/.test(formData.tinNumber)) {
-          newErrors.tinNumber = "TIN number format is invalid"
+        // Create FormData object for server action
+        const submitData = new FormData()
+        submitData.append("tinNumber", formData.tinNumber)
+        submitData.append("vatRegistered", formData.vatRegistered.toString())
+        submitData.append("fiscalYearEnd", formData.fiscalYearEnd)
+        submitData.append("birRegistrationDate", formData.birRegistrationDate)
+
+        try {
+          const result = await saveTaxInfo(submitData)
+
+          if (result) {
+            // Handle errors
+            if (result.errors) {
+              const fieldErrors: Record<string, string> = {}
+              Object.entries(result.errors).forEach(([key, messages]) => {
+                fieldErrors[key] = messages[0]
+              })
+              setErrors(fieldErrors)
+            }
+
+            if (result.message) {
+              setGeneralError(result.message)
+            }
+
+            setIsLoading(false)
+            return false
+          }
+
+          setIsLoading(false)
+          return true
+        } catch (error) {
+          setGeneralError("An unexpected error occurred. Please try again.")
+          setIsLoading(false)
+          return false
         }
-
-        if (!formData.fiscalYearEnd) newErrors.fiscalYearEnd = "Fiscal year end is required"
-
-        setErrors(newErrors)
-        return Object.keys(newErrors).length === 0
       },
     },
     {
       title: "Preferences",
-      component: <BookkeepingPreferencesStep formData={formData} updateFormData={setFormData} errors={errors} />,
-      validate: () => true,
+      component: (
+        <BookkeepingPreferencesStep
+          formData={formData}
+          updateFormData={setFormData}
+          errors={errors}
+          isLoading={isLoading}
+        />
+      ),
+      validate: async () => {
+        setIsLoading(true)
+        setGeneralError("")
+        setErrors({})
+
+        // Create FormData object for server action
+        const submitData = new FormData()
+        submitData.append("accountingMethod", formData.accountingMethod)
+        submitData.append("chartOfAccounts", formData.chartOfAccounts)
+        submitData.append("currencyPreference", formData.currencyPreference)
+        submitData.append("digitalReceipts", formData.digitalReceipts.toString())
+
+        try {
+          const result = await savePreferences(submitData)
+
+          if (result) {
+            // Handle errors
+            if (result.errors) {
+              const fieldErrors: Record<string, string> = {}
+              Object.entries(result.errors).forEach(([key, messages]) => {
+                fieldErrors[key] = messages[0]
+              })
+              setErrors(fieldErrors)
+            }
+
+            if (result.message) {
+              setGeneralError(result.message)
+            }
+
+            setIsLoading(false)
+            return false
+          }
+
+          setIsLoading(false)
+          return true
+        } catch (error) {
+          setGeneralError("An unexpected error occurred. Please try again.")
+          setIsLoading(false)
+          return false
+        }
+      },
     },
     {
       title: "Complete",
@@ -105,8 +226,8 @@ export default function OnboardingWizard() {
     },
   ]
 
-  const goToNextStep = () => {
-    const isValid = steps[currentStep].validate()
+  const goToNextStep = async () => {
+    const isValid = await steps[currentStep].validate()
 
     if (isValid && currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1)
@@ -121,13 +242,16 @@ export default function OnboardingWizard() {
     }
   }
 
-  const handleSubmit = () => {
-    const isValid = steps[currentStep].validate()
+  const handleSubmit = async () => {
+    const isValid = await steps[currentStep].validate()
 
     if (isValid) {
-      // Here you would typically send the data to your backend
-      console.log("Form submitted with data:", formData)
-      goToNextStep()
+      try {
+        await completeOnboarding()
+        goToNextStep()
+      } catch (error) {
+        setGeneralError("An error occurred while completing onboarding")
+      }
     }
   }
 
@@ -148,6 +272,10 @@ export default function OnboardingWizard() {
           </p>
         </div>
 
+        {generalError && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">{generalError}</div>
+        )}
+
         <StepIndicator steps={steps.map((step) => step.title)} currentStep={currentStep} />
 
         <div className="mt-8 min-h-[450px]">{steps[currentStep].component}</div>
@@ -158,6 +286,7 @@ export default function OnboardingWizard() {
             goToNextStep={isLastStep ? handleSubmit : goToNextStep}
             goToPreviousStep={goToPreviousStep}
             isLastStep={isLastStep}
+            isLoading={isLoading}
           />
         )}
       </CardContent>

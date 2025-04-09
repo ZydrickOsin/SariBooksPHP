@@ -1,20 +1,16 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
-import type { AuthData } from "../authentication-page"
+import { register } from "@/app/actions/auth-actions"
+import { useRouter } from "next/navigation"
 
-interface RegisterFormProps {
-  onSubmit: (data: AuthData) => void
-}
-
-export default function RegisterForm({ onSubmit }: RegisterFormProps) {
-  const [formData, setFormData] = useState<AuthData>({
+export default function RegisterForm() {
+  const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
@@ -24,6 +20,9 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [generalError, setGeneralError] = useState("")
+  const router = useRouter()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -34,10 +33,13 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
     setConfirmPassword(e.target.value)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setGeneralError("")
+    setErrors({})
 
-    // Validation
+    // Basic client-side validation
     const newErrors: Record<string, string> = {}
 
     if (!formData.firstName) newErrors.firstName = "First name is required"
@@ -59,10 +61,43 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
       newErrors.confirmPassword = "Passwords do not match"
     }
 
-    setErrors(newErrors)
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      setIsLoading(false)
+      return
+    }
 
-    if (Object.keys(newErrors).length === 0) {
-      onSubmit(formData)
+    // Create FormData object for server action
+    const submitData = new FormData()
+    submitData.append("firstName", formData.firstName)
+    submitData.append("lastName", formData.lastName)
+    submitData.append("email", formData.email)
+    submitData.append("password", formData.password)
+
+    try {
+      const result = await register(submitData)
+
+      if (result) {
+        // Handle errors
+        if (result.errors) {
+          const fieldErrors: Record<string, string> = {}
+          Object.entries(result.errors).forEach(([key, messages]) => {
+            fieldErrors[key] = messages[0]
+          })
+          setErrors(fieldErrors)
+        }
+
+        if (result.message) {
+          setGeneralError(result.message)
+        }
+      } else {
+        // Success - redirect to onboarding
+        router.push("/onboarding")
+      }
+    } catch (error) {
+      setGeneralError("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -72,6 +107,10 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
         <h2 className="text-2xl font-bold">Create Your Account</h2>
         <p className="text-muted-foreground">Sign up for SariBooksPH</p>
       </div>
+
+      {generalError && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{generalError}</div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -83,6 +122,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
             value={formData.firstName}
             onChange={handleChange}
             className={errors.firstName ? "border-red-500" : ""}
+            disabled={isLoading}
           />
           {errors.firstName && <p className="text-red-500 text-sm">{errors.firstName}</p>}
         </div>
@@ -96,6 +136,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
             value={formData.lastName}
             onChange={handleChange}
             className={errors.lastName ? "border-red-500" : ""}
+            disabled={isLoading}
           />
           {errors.lastName && <p className="text-red-500 text-sm">{errors.lastName}</p>}
         </div>
@@ -111,6 +152,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
           value={formData.email}
           onChange={handleChange}
           className={errors.email ? "border-red-500" : ""}
+          disabled={isLoading}
         />
         {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
       </div>
@@ -126,6 +168,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
             value={formData.password}
             onChange={handleChange}
             className={errors.password ? "border-red-500 pr-10" : "pr-10"}
+            disabled={isLoading}
           />
           <button
             type="button"
@@ -150,6 +193,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
             value={confirmPassword}
             onChange={handleConfirmPasswordChange}
             className={errors.confirmPassword ? "border-red-500 pr-10" : "pr-10"}
+            disabled={isLoading}
           />
           <button
             type="button"
@@ -162,8 +206,8 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
         {errors.confirmPassword && <p className="text-red-500 text-sm">{errors.confirmPassword}</p>}
       </div>
 
-      <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700">
-        Create Account
+      <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={isLoading}>
+        {isLoading ? "Creating account..." : "Create Account"}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">

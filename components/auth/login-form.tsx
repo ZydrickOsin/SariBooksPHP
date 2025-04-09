@@ -1,35 +1,37 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
-import type { AuthData } from "../authentication-page"
+import { login } from "@/app/actions/auth-actions"
+import { useRouter } from "next/navigation"
 
-interface LoginFormProps {
-  onSubmit: (data: Partial<AuthData>) => void
-}
-
-export default function LoginForm({ onSubmit }: LoginFormProps) {
+export default function LoginForm() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [generalError, setGeneralError] = useState("")
+  const router = useRouter()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setGeneralError("")
+    setErrors({})
 
-    // Basic validation
+    // Basic client-side validation
     const newErrors: Record<string, string> = {}
 
     if (!formData.email) {
@@ -42,10 +44,41 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
       newErrors.password = "Password is required"
     }
 
-    setErrors(newErrors)
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      setIsLoading(false)
+      return
+    }
 
-    if (Object.keys(newErrors).length === 0) {
-      onSubmit(formData)
+    // Create FormData object for server action
+    const submitData = new FormData()
+    submitData.append("email", formData.email)
+    submitData.append("password", formData.password)
+
+    try {
+      const result = await login(submitData)
+
+      if (result) {
+        // Handle errors
+        if (result.errors) {
+          const fieldErrors: Record<string, string> = {}
+          Object.entries(result.errors).forEach(([key, messages]) => {
+            fieldErrors[key] = messages[0]
+          })
+          setErrors(fieldErrors)
+        }
+
+        if (result.message) {
+          setGeneralError(result.message)
+        }
+      } else {
+        // Success - redirect to onboarding
+        router.push("/onboarding")
+      }
+    } catch (error) {
+      setGeneralError("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -55,6 +88,10 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
         <h2 className="text-2xl font-bold">Welcome Back</h2>
         <p className="text-muted-foreground">Sign in to your SariBooksPH account</p>
       </div>
+
+      {generalError && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{generalError}</div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
@@ -66,6 +103,7 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
           value={formData.email}
           onChange={handleChange}
           className={errors.email ? "border-red-500" : ""}
+          disabled={isLoading}
         />
         {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
       </div>
@@ -86,6 +124,7 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
             value={formData.password}
             onChange={handleChange}
             className={errors.password ? "border-red-500 pr-10" : "pr-10"}
+            disabled={isLoading}
           />
           <button
             type="button"
@@ -98,8 +137,8 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
         {errors.password && <p className="text-red-500 text-sm">{errors.password}</p>}
       </div>
 
-      <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700">
-        Sign In
+      <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={isLoading}>
+        {isLoading ? "Signing in..." : "Sign In"}
       </Button>
     </form>
   )
